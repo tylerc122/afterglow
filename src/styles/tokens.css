@@ -1,0 +1,72 @@
+/* Afterglow design tokens. Change things here, not in components. */
+
+@property --accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #ff9a6e;
+}
+@property --tint {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #ff7a45;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* the room */
+  --bg: #08080a;
+  --bg-raise: rgba(20, 20, 24, 0.72);
+  --glass: rgba(14, 14, 17, 0.58);
+  --glass-strong: rgba(14, 14, 17, 0.82);
+  /* sticky chrome when scrolled (top bar + list header), one material */
+  --chrome: rgba(13, 12, 15, 0.9);
+  --chrome-blur: blur(30px) saturate(1.5);
+
+  /* light on dark: warm whites, never pure */
+  --text: #f5f3ef;
+  --text-2: rgba(245, 243, 239, 0.64);
+  --text-3: rgba(245, 243, 239, 0.4);
+  --text-4: rgba(245, 243, 239, 0.24);
+
+  --hair: rgba(255, 255, 255, 0.07);
+  --hair-strong: rgba(255, 255, 255, 0.13);
+  --hover: rgba(255, 255, 255, 0.05);
+  --press: rgba(255, 255, 255, 0.09);
+
+  /* set live from album art, animated through @property */
+  --accent: #ff9a6e;
+  --tint: #ff7a45;
+  --on-accent: #120d0b;
+
+  /* type */
+  --font: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', monospace;
+  --t-xs: 11px;
+  --t-sm: 12.5px;
+  --t-md: 14px;
+  --t-lg: 16px;
+  --t-xl: 22px;
+  --t-2xl: 34px;
+  --t-display: clamp(44px, 6.4vw, 104px);
+
+  /* shape */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r: 10px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+
+  /* space */
+  --gutter: clamp(20px, 3vw, 40px);
+  --sidebar: 272px;
+  --bar: 84px;
+
+  /* motion: fast for anything you clicked, slow for anything ambient */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --fast: 110ms;
+  --base: 200ms;
+  --slow: 520ms;
+  --color: 1400ms;
+}

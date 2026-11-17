@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <clipPath id="sq"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c2a31"/><stop offset="1" stop-color="#151418"/></linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".2"/><stop offset=".25" stop-color="#fff" stop-opacity=".03"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="warm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffc77d"/><stop offset=".55" stop-color="#ff7a5c"/><stop offset="1" stop-color="#e8487f"/></linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <path d="M302 560 A210 210 0 0 1 722 560 Z" fill="url(#warm)"/>
+  <rect x="262" y="596" width="500" height="34" rx="17" fill="#ff7a5c"/>
+  <rect x="352" y="664" width="320" height="34" rx="17" fill="#e8487f" opacity=".8"/>
+  <rect x="432" y="732" width="160" height="34" rx="17" fill="#b23d8c" opacity=".6"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="184" fill="none" stroke="url(#edge)" stroke-width="3"/>
+</svg>
