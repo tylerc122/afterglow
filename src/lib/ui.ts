@@ -7,6 +7,8 @@ export type MenuState = {
   x: number
   y: number
   track: Track
+  /** set when several rows were selected, the menu acts on all of them */
+  tracks?: Track[]
   /** set when the track was opened from a playlist we can edit */
   playlistId?: string
   index?: number

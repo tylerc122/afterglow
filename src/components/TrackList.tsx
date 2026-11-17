@@ -1,6 +1,7 @@
 // The list every page is built on. Virtualized against the main scroller so a
-// 5,000 song playlist scrolls like a 20 song one. Click selects, double click
-// (or enter) plays, right click opens the menu.
+// 5,000 song playlist scrolls like a 20 song one. Click selects, cmd/ctrl click
+// toggles, shift click grabs a range, cmd/ctrl+A grabs everything, double click
+// (or enter) plays, right click opens the menu for whatever's selected.
 
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -10,7 +11,7 @@ import { useLibrary } from '../lib/library'
 import { usePlayer } from '../lib/player'
 import { link } from '../lib/router'
 import type { Track } from '../lib/types'
-import { openMenu } from '../lib/ui'
+import { openMenu, useUI } from '../lib/ui'
 import { Cover } from './Cover'
 import { Icon } from './Icon'
 import { Eq } from './Sidebar'
@@ -38,7 +39,9 @@ export function TrackList({ tracks, added, variant = 'playlist', filter = '', so
   const currentUri = usePlayer((s) => s.track?.uri)
   const paused = usePlayer((s) => s.paused)
   const liked = useLibrary((s) => s.liked)
-  const [selected, setSelected] = useState<number | null>(null)
+  // original indexes, plus the row shift-click ranges from and arrows move
+  const [selected, setSelected] = useState<Set<number>>(() => new Set())
+  const [anchor, setAnchor] = useState<number | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const sentinel = useRef<HTMLDivElement>(null)
   const [stuck, setStuck] = useState(false)
@@ -95,15 +98,48 @@ export function TrackList({ tracks, added, variant = 'playlist', filter = '', so
     scrollMargin: margin,
   })
 
-  // arrow keys move the selection, enter plays it
+  // a different playlist (or a new filter) starts with nothing selected
+  useEffect(() => {
+    setSelected(new Set())
+    setAnchor(null)
+  }, [tracks, filter])
+
+  const select = (i: number, e: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }) => {
+    if (e.shiftKey && anchor !== null) {
+      const a = rows.findIndex((r) => r.i === anchor)
+      const b = rows.findIndex((r) => r.i === i)
+      if (a >= 0 && b >= 0) {
+        const range = rows.slice(Math.min(a, b), Math.max(a, b) + 1).map((r) => r.i)
+        setSelected(e.metaKey || e.ctrlKey ? new Set([...selected, ...range]) : new Set(range))
+        return
+      }
+    }
+    if (e.metaKey || e.ctrlKey) {
+      const next = new Set(selected)
+      next.has(i) ? next.delete(i) : next.add(i)
+      setSelected(next)
+    } else setSelected(new Set([i]))
+    setAnchor(i)
+  }
+
+  // cmd/ctrl+A selects everything showing, arrows move, enter plays, escape clears
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (selected === null || (e.target as HTMLElement).closest('input,textarea')) return
-      const pos = rows.findIndex((r) => r.i === selected)
+      if ((e.target as HTMLElement).closest('input,textarea,[contenteditable]') || useUI.getState().menu) return
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+        if (!rows.length) return
+        e.preventDefault()
+        setSelected(new Set(rows.map((r) => r.i)))
+        return
+      }
+      if (anchor === null && !selected.size) return
+      if (e.key === 'Escape') return setSelected(new Set())
+      const pos = rows.findIndex((r) => r.i === anchor)
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault()
         const np = Math.max(0, Math.min(rows.length - 1, pos + (e.key === 'ArrowDown' ? 1 : -1)))
-        setSelected(rows[np].i)
+        setSelected(new Set([rows[np].i]))
+        setAnchor(rows[np].i)
         v.scrollToIndex(np, { align: 'auto' })
       } else if (e.key === 'Enter' && pos >= 0) {
         onPlay(rows[pos].t, rows[pos].i)
@@ -111,7 +147,7 @@ export function TrackList({ tracks, added, variant = 'playlist', filter = '', so
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selected, rows, onPlay, v])
+  }, [selected, anchor, rows, onPlay, v])
 
   const head = (key: Sort['key'], label: React.ReactNode, cls: string) => (
     <button
@@ -150,13 +186,20 @@ export function TrackList({ tracks, added, variant = 'playlist', filter = '', so
               variant={variant}
               current={isCur}
               paused={paused}
-              selected={selected === i}
+              selected={selected.has(i)}
               liked={liked.has(t.id)}
-              onSelect={() => setSelected(i)}
+              onSelect={(e) => select(i, e)}
               onPlay={() => onPlay(t, i)}
               onMenu={(e) => {
                 e.preventDefault()
-                setSelected(i)
+                // right clicking inside a multi-selection acts on all of it, in list order
+                if (selected.has(i) && selected.size > 1) {
+                  const picked = rows.filter((r) => selected.has(r.i)).map((r) => r.t)
+                  openMenu({ x: e.clientX, y: e.clientY, track: t, tracks: picked })
+                  return
+                }
+                setSelected(new Set([i]))
+                setAnchor(i)
                 openMenu({ x: e.clientX, y: e.clientY, track: t, playlistId, index: i })
               }}
             />
@@ -178,7 +221,7 @@ type RowProps = {
   paused: boolean
   selected: boolean
   liked: boolean
-  onSelect: () => void
+  onSelect: (e: React.MouseEvent) => void
   onPlay: () => void
   onMenu: (e: React.MouseEvent) => void
 }
