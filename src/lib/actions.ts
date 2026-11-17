@@ -34,12 +34,16 @@ export async function addToPlaylist(playlistId: string, tracks: Track[]) {
   putItems({ id: playlistId, ids: [...prev.ids, ...tracks.map((t) => t.id)], added: [...prev.added, ...tracks.map(() => now)] })
   if (p) putPlaylist({ ...p, total: p.total + tracks.length })
   try {
-    const r = await api<{ snapshot_id: string }>(`/playlists/${playlistId}/items`, {
-      method: 'POST',
-      body: { uris: tracks.map((t) => t.uri) },
-    })
+    // spotify takes 100 uris per request, so a big select-all goes in batches
+    let r: { snapshot_id: string } | undefined
+    for (let i = 0; i < tracks.length; i += 100) {
+      r = await api<{ snapshot_id: string }>(`/playlists/${playlistId}/items`, {
+        method: 'POST',
+        body: { uris: tracks.slice(i, i + 100).map((t) => t.uri) },
+      })
+    }
     if (p && r?.snapshot_id) putPlaylist({ ...useLibrary.getState().playlists[playlistId], snapshot: r.snapshot_id, syncedSnapshot: r.snapshot_id })
-    toast(`Added to ${p?.name ?? 'playlist'}`)
+    toast(tracks.length > 1 ? `Added ${tracks.length.toLocaleString()} songs to ${p?.name ?? 'playlist'}` : `Added to ${p?.name ?? 'playlist'}`)
   } catch {
     putItems(prev)
     if (p) putPlaylist(p)
