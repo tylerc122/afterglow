@@ -31,7 +31,12 @@ declare namespace Spotify {
     message: string
   }
   class Player {
-    constructor(opts: { name: string; getOAuthToken: (cb: (t: string) => void) => void; volume?: number })
+    constructor(opts: {
+      name: string
+      getOAuthToken: (cb: (t: string) => void) => void
+      volume?: number
+      enableMediaSession?: boolean
+    })
     connect(): Promise<boolean>
     disconnect(): void
     addListener(e: 'ready' | 'not_ready', cb: (d: { device_id: string }) => void): void

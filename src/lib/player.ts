@@ -104,6 +104,11 @@ export function initPlayer() {
       name: 'Afterglow',
       getOAuthToken: (cb) => void getToken().then(cb),
       volume: get().volume,
+      // The audio lives in the SDK's iframe, and Chromium sends media keys (keyboard,
+      // headphones) to the frame that owns the audio. Without this, that frame has no
+      // handlers, so Chromium pauses the <audio> element itself behind the SDK's back:
+      // the ui says paused, the music keeps going, and the next press glitches.
+      enableMediaSession: true,
     })
     sdk.addListener('ready', ({ device_id }) => {
       set({ deviceId: device_id, sdkStatus: 'ready' })
