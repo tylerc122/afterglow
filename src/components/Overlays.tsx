@@ -204,8 +204,14 @@ export function Toasts() {
   return (
     <div className="toasts" aria-live="polite">
       {list.map((t) => (
-        <div key={t.id} className="toast">
-          {t.text}
+        <div key={t.id} className={`toast ${t.images || t.action ? 'rich' : ''}`} style={{ animationDuration: `${t.ms}ms` }}>
+          {t.images && <Cover images={t.images} size="sm" className="toast-art" />}
+          <span className="toast-text">{t.text}</span>
+          {t.action && (
+            <button className="toast-action" onClick={t.action.run}>
+              {t.action.label}
+            </button>
+          )}
         </div>
       ))}
     </div>

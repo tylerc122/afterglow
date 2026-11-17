@@ -3,6 +3,7 @@
 import { api } from './api'
 import * as N from './normalize'
 import { putAlbum, putArtist, putItems, putPlaylist, putTracks, useLibrary } from './library'
+import { go } from './router'
 import { toast } from './toast'
 import type { Album, Artist, Track } from './types'
 
@@ -30,6 +31,11 @@ export async function addToPlaylist(playlistId: string, tracks: Track[]) {
   const p = s.playlists[playlistId]
   const prev = s.items[playlistId] ?? { id: playlistId, ids: [], added: [] }
   const now = new Date().toISOString()
+  const what = tracks.length > 1 ? `${tracks.length.toLocaleString()} songs` : `“${tracks[0]?.name}”`
+  const where = p?.name ?? 'playlist'
+  const key = `add-${playlistId}-${Date.now()}`
+  // say something right away, a big batch can take a few seconds to land
+  if (tracks.length > 100) toast(`Adding ${what} to ${where}…`, { key, images: p?.images, ms: 30_000 })
   putTracks(tracks)
   putItems({ id: playlistId, ids: [...prev.ids, ...tracks.map((t) => t.id)], added: [...prev.added, ...tracks.map(() => now)] })
   if (p) putPlaylist({ ...p, total: p.total + tracks.length })
@@ -43,11 +49,16 @@ export async function addToPlaylist(playlistId: string, tracks: Track[]) {
       })
     }
     if (p && r?.snapshot_id) putPlaylist({ ...useLibrary.getState().playlists[playlistId], snapshot: r.snapshot_id, syncedSnapshot: r.snapshot_id })
-    toast(tracks.length > 1 ? `Added ${tracks.length.toLocaleString()} songs to ${p?.name ?? 'playlist'}` : `Added to ${p?.name ?? 'playlist'}`)
+    toast(`Added ${what} to ${where}`, {
+      key,
+      images: p?.images,
+      ms: 4500,
+      action: { label: 'View', run: () => go(`/playlist/${playlistId}`) },
+    })
   } catch {
     putItems(prev)
     if (p) putPlaylist(p)
-    toast('Couldn’t add to that playlist')
+    toast(`Couldn’t add ${what} to ${where}`, { key, ms: 4500 })
   }
 }
 
