@@ -5,7 +5,7 @@
 
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { setLiked } from '../lib/actions'
+import { removeManyFromPlaylist, setLiked } from '../lib/actions'
 import { ago, time } from '../lib/format'
 import { useLibrary } from '../lib/library'
 import { usePlayer } from '../lib/player'
@@ -134,6 +134,15 @@ export function TrackList({ tracks, added, variant = 'playlist', filter = '', so
       }
       if (anchor === null && !selected.size) return
       if (e.key === 'Escape') return setSelected(new Set())
+      // cmd/ctrl+backspace (or delete) takes the selection out of a playlist you own
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'Backspace' || e.key === 'Delete')) {
+        if (!playlistId || !selected.size) return
+        e.preventDefault()
+        removeManyFromPlaylist(playlistId, rows.filter((r) => selected.has(r.i)).map((r) => r.t))
+        setSelected(new Set())
+        setAnchor(null)
+        return
+      }
       const pos = rows.findIndex((r) => r.i === anchor)
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault()
@@ -147,7 +156,7 @@ export function TrackList({ tracks, added, variant = 'playlist', filter = '', so
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selected, anchor, rows, onPlay, v])
+  }, [selected, anchor, rows, onPlay, v, playlistId])
 
   const head = (key: Sort['key'], label: React.ReactNode, cls: string) => (
     <button
@@ -195,7 +204,7 @@ export function TrackList({ tracks, added, variant = 'playlist', filter = '', so
                 // right clicking inside a multi-selection acts on all of it, in list order
                 if (selected.has(i) && selected.size > 1) {
                   const picked = rows.filter((r) => selected.has(r.i)).map((r) => r.t)
-                  openMenu({ x: e.clientX, y: e.clientY, track: t, tracks: picked })
+                  openMenu({ x: e.clientX, y: e.clientY, track: t, tracks: picked, playlistId })
                   return
                 }
                 setSelected(new Set([i]))

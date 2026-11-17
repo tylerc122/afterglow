@@ -62,26 +62,87 @@ export async function addToPlaylist(playlistId: string, tracks: Track[]) {
   }
 }
 
-export async function removeFromPlaylist(playlistId: string, index: number) {
+/**
+ * Remove a bunch of songs at once. Spotify deletes by uri, which takes out every copy
+ * of that song in the playlist, so we do the same locally to match. The toast's undo
+ * puts them back where they were (as new adds, so their added dates reset).
+ */
+export async function removeManyFromPlaylist(playlistId: string, tracks: Track[]) {
   const s = useLibrary.getState()
   const p = s.playlists[playlistId]
   const prev = s.items[playlistId]
-  if (!prev || !p) return
-  const t = s.tracks.get(prev.ids[index])
-  if (!t) return
-  putItems({ id: playlistId, ids: prev.ids.filter((_, j) => j !== index), added: prev.added.filter((_, j) => j !== index) })
-  putPlaylist({ ...p, total: Math.max(0, p.total - 1) })
+  if (!prev || !p || !tracks.length) return
+  const gone = new Set(tracks.map((t) => t.id))
+  const uris = [...new Set(tracks.map((t) => t.uri))]
+  const keep = prev.ids.map((id, i) => i).filter((i) => !gone.has(prev.ids[i]))
+  const removed = prev.ids.length - keep.length
+  putItems({ id: playlistId, ids: keep.map((i) => prev.ids[i]), added: keep.map((i) => prev.added[i]) })
+  putPlaylist({ ...p, total: Math.max(0, p.total - removed) })
+  const what = removed > 1 ? `${removed.toLocaleString()} songs` : `“${tracks[0].name}”`
   try {
-    const r = await api<{ snapshot_id: string }>(`/playlists/${playlistId}/items`, {
-      method: 'DELETE',
-      body: { items: [{ uri: t.uri }], snapshot_id: p.snapshot },
+    let snapshot = p.snapshot
+    for (let i = 0; i < uris.length; i += 100) {
+      const r = await api<{ snapshot_id: string }>(`/playlists/${playlistId}/items`, {
+        method: 'DELETE',
+        body: { items: uris.slice(i, i + 100).map((uri) => ({ uri })), snapshot_id: snapshot },
+      })
+      if (r?.snapshot_id) snapshot = r.snapshot_id
+    }
+    putPlaylist({ ...useLibrary.getState().playlists[playlistId], snapshot, syncedSnapshot: snapshot })
+    toast(`Removed ${what} from ${p.name}`, {
+      images: p.images,
+      ms: 6000,
+      action: { label: 'Undo', run: () => restore(playlistId, prev.ids, gone) },
     })
-    if (r?.snapshot_id) putPlaylist({ ...useLibrary.getState().playlists[playlistId], snapshot: r.snapshot_id, syncedSnapshot: r.snapshot_id })
-    toast(`Removed from ${p.name}`)
   } catch {
     putItems(prev)
     putPlaylist(p)
-    toast('Couldn’t remove that')
+    toast(`Couldn’t remove ${what}`)
+  }
+}
+
+/** put removed songs back at their old spots, one insert per run of neighbours */
+async function restore(playlistId: string, oldIds: string[], gone: Set<string>) {
+  const s = useLibrary.getState()
+  const p = s.playlists[playlistId]
+  const cur = s.items[playlistId]
+  if (!p || !cur) return
+  const runs: { at: number; ids: string[] }[] = []
+  oldIds.forEach((id, i) => {
+    if (!gone.has(id)) return
+    const last = runs[runs.length - 1]
+    if (last && last.at + last.ids.length === i) last.ids.push(id)
+    else runs.push({ at: i, ids: [id] })
+  })
+  // going front to back, each run's old index is right once the earlier runs are back in
+  const ids = [...cur.ids]
+  const added = [...cur.added]
+  const now = new Date().toISOString()
+  for (const r of runs) {
+    ids.splice(r.at, 0, ...r.ids)
+    added.splice(r.at, 0, ...r.ids.map(() => now))
+  }
+  const count = runs.reduce((n, r) => n + r.ids.length, 0)
+  putItems({ id: playlistId, ids, added })
+  putPlaylist({ ...p, total: p.total + count })
+  try {
+    let snapshot = p.snapshot
+    for (const r of runs) {
+      for (let i = 0; i < r.ids.length; i += 100) {
+        const uris = r.ids.slice(i, i + 100).map((id) => s.tracks.get(id)?.uri ?? `spotify:track:${id}`)
+        const res = await api<{ snapshot_id: string }>(`/playlists/${playlistId}/items`, {
+          method: 'POST',
+          body: { uris, position: r.at + i },
+        })
+        if (res?.snapshot_id) snapshot = res.snapshot_id
+      }
+    }
+    putPlaylist({ ...useLibrary.getState().playlists[playlistId], snapshot, syncedSnapshot: snapshot })
+    toast(`Put ${count > 1 ? `${count.toLocaleString()} songs` : 'it'} back`)
+  } catch {
+    putItems(cur)
+    putPlaylist(p)
+    toast('Couldn’t undo that, the songs are still removed')
   }
 }
 

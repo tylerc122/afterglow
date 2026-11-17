@@ -2115,6 +2115,12 @@ kbd {
   margin-left: auto;
   color: var(--text-3);
 }
+.menu-key {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-3);
+}
 .menu-sep {
   height: 1px;
   margin: 5px 8px;

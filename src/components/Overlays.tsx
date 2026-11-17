@@ -1,7 +1,7 @@
 // Right-click menu, toasts, and the top bar. The small stuff around the edges.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { addToPlaylist, removeFromPlaylist, setLiked } from '../lib/actions'
+import { addToPlaylist, removeManyFromPlaylist, setLiked } from '../lib/actions'
 import { isOwned, useLibrary } from '../lib/library'
 import { addToQueue, playUris } from '../lib/player'
 import { back, forward, go, link, useRouter } from '../lib/router'
@@ -171,14 +171,15 @@ export function ContextMenu() {
             >
               <Icon name="link" size={16} /> Copy link
             </button>
-            {menu.playlistId !== undefined && menu.index !== undefined && (
-              <>
-                <div className="menu-sep" />
-                <button className="menu-item danger" {...item} onClick={act(() => removeFromPlaylist(menu.playlistId!, menu.index!))}>
-                  <Icon name="trash" size={16} /> Remove from this playlist
-                </button>
-              </>
-            )}
+          </>
+        )}
+        {menu.playlistId !== undefined && (
+          <>
+            <div className="menu-sep" />
+            <button className="menu-item danger" {...item} onClick={act(() => removeManyFromPlaylist(menu.playlistId!, picked))}>
+              <Icon name="trash" size={16} /> {many ? `Remove ${many.length.toLocaleString()} from this playlist` : 'Remove from this playlist'}
+              <span className="menu-key">⌘⌫</span>
+            </button>
           </>
         )}
       </div>
