@@ -68,7 +68,11 @@ function createWindow() {
     },
   })
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    win.show()
+    // `--fullscreen` opens straight into macOS full screen (handy for recording)
+    if (process.argv.includes('--fullscreen')) win.setFullScreen(true)
+  })
 
   // links that leave the app (copied Spotify links etc.) open in the real browser,
   // but the Spotify sign-in page stays in-window so the redirect comes back here
