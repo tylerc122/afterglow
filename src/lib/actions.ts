@@ -35,7 +35,8 @@ export async function addToPlaylist(playlistId: string, tracks: Track[]) {
   const where = p?.name ?? 'playlist'
   const key = `add-${playlistId}-${Date.now()}`
   // say something right away, a big batch can take a few seconds to land
-  if (tracks.length > 100) toast(`Adding ${what} to ${where}…`, { key, images: p?.images, ms: 30_000 })
+  toast(`Adding ${what} to ${where}…`, { key, images: p?.images, ms: 60_000 })
+  const onWait = () => toast(`Spotify’s rate limiting, still adding ${what}…`, { key, images: p?.images, ms: 60_000 })
   putTracks(tracks)
   putItems({ id: playlistId, ids: [...prev.ids, ...tracks.map((t) => t.id)], added: [...prev.added, ...tracks.map(() => now)] })
   if (p) putPlaylist({ ...p, total: p.total + tracks.length })
@@ -46,6 +47,7 @@ export async function addToPlaylist(playlistId: string, tracks: Track[]) {
       r = await api<{ snapshot_id: string }>(`/playlists/${playlistId}/items`, {
         method: 'POST',
         body: { uris: tracks.slice(i, i + 100).map((t) => t.uri) },
+        onWait,
       })
     }
     if (p && r?.snapshot_id) putPlaylist({ ...useLibrary.getState().playlists[playlistId], snapshot: r.snapshot_id, syncedSnapshot: r.snapshot_id })
@@ -79,6 +81,9 @@ export async function removeManyFromPlaylist(playlistId: string, tracks: Track[]
   putItems({ id: playlistId, ids: keep.map((i) => prev.ids[i]), added: keep.map((i) => prev.added[i]) })
   putPlaylist({ ...p, total: Math.max(0, p.total - removed) })
   const what = removed > 1 ? `${removed.toLocaleString()} songs` : `“${tracks[0].name}”`
+  const key = `remove-${playlistId}-${Date.now()}`
+  toast(`Removing ${what} from ${p.name}…`, { key, images: p.images, ms: 60_000 })
+  const onWait = () => toast(`Spotify’s rate limiting, still removing ${what}…`, { key, images: p.images, ms: 60_000 })
   try {
     // no snapshot_id: with one, Spotify checks the request against that exact version
     // and errors if ours is even slightly stale. By uri it doesn't need it.
@@ -87,11 +92,13 @@ export async function removeManyFromPlaylist(playlistId: string, tracks: Track[]
       const r = await api<{ snapshot_id: string }>(`/playlists/${playlistId}/items`, {
         method: 'DELETE',
         body: { items: uris.slice(i, i + 100).map((uri) => ({ uri })) },
+        onWait,
       })
       if (r?.snapshot_id) snapshot = r.snapshot_id
     }
     putPlaylist({ ...useLibrary.getState().playlists[playlistId], snapshot, syncedSnapshot: snapshot })
     toast(`Removed ${what} from ${p.name}`, {
+      key,
       images: p.images,
       ms: 6000,
       action: { label: 'Undo', run: () => restore(playlistId, prev.ids, gone) },
@@ -100,7 +107,7 @@ export async function removeManyFromPlaylist(playlistId: string, tracks: Track[]
     console.error('remove failed', e)
     putItems(prev)
     putPlaylist(p)
-    toast(`Couldn’t remove ${what}${e instanceof Error && e.message ? ` (${e.message})` : ''}`, { ms: 6000 })
+    toast(`Couldn’t remove ${what}${e instanceof Error && e.message ? ` (${e.message})` : ''}`, { key, ms: 6000 })
   }
 }
 

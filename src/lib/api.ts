@@ -47,7 +47,13 @@ const PATIENCE = 45_000
 
 export async function api<T = any>(
   path: string,
-  init: { method?: string; body?: unknown; query?: Record<string, string | number | undefined> } = {},
+  init: {
+    method?: string
+    body?: unknown
+    query?: Record<string, string | number | undefined>
+    /** called when this request has to sit out a rate limit, so the ui can say so */
+    onWait?: (ms: number) => void
+  } = {},
 ): Promise<T> {
   const url = new URL(path.startsWith('http') ? path : BASE + path)
   for (const [k, v] of Object.entries(init.query ?? {})) if (v !== undefined) url.searchParams.set(k, String(v))
@@ -59,6 +65,7 @@ export async function api<T = any>(
       if (rateLimited()) {
         const wait = coolUntil - Date.now()
         if (Date.now() + wait - started > PATIENCE) throw new ApiError(429, `Spotify’s rate limiting, try again in ${Math.ceil(wait / 60_000)} min`)
+        init.onWait?.(wait)
         await sleep(wait)
       }
       const token = await getToken()
