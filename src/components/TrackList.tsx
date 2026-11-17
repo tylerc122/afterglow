@@ -186,7 +186,7 @@ type RowProps = {
 const Row = memo(function Row({ y, t, n, added, variant, current, paused, selected, liked, onSelect, onPlay, onMenu }: RowProps) {
   return (
     <div
-      className={`row ${current ? 'current' : ''} ${selected ? 'selected' : ''}`}
+      className={`row ${current ? 'current' : ''} ${current && paused ? 'paused' : ''} ${selected ? 'selected' : ''}`}
       style={{ transform: `translateY(${y}px)` }}
       onClick={onSelect}
       onDoubleClick={onPlay}

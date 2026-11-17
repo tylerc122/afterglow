@@ -1,7 +1,8 @@
 // Page header. Big art, bigger title, and a wash of the art's own color.
 // When it scrolls out of view the title slides into the top bar.
 
-import { createContext, useContext, useEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef } from 'react'
+import { land } from '../lib/flight'
 import { css, usePalette } from '../lib/colors'
 import type { Images } from '../lib/types'
 import { useUI } from '../lib/ui'
@@ -24,6 +25,9 @@ export function Hero({ kicker, title, images, liked, round, children }: Props) {
   const pal = usePalette(images?.sm)
   const ref = useRef<HTMLElement>(null)
   const scroller = useScroller()
+
+  // if you got here by clicking a cover, it flies in to become this art
+  useLayoutEffect(() => land(ref.current?.querySelector('.hero-art') as HTMLElement | null), [])
 
   // this page's art lights the room when nothing is playing
   useEffect(() => {

@@ -215,7 +215,10 @@ function Rail({ pill, timeEl }: { pill: React.RefObject<HTMLDivElement>; timeEl:
       const s = usePlayer.getState()
       const d = s.track?.durationMs ?? 0
       const p = drag.current ?? positionNow()
-      pill.current?.style.setProperty('--p', String(d ? Math.min(p / d, 1) : 0))
+      const f = String(d ? Math.min(p / d, 1) : 0)
+      pill.current?.style.setProperty('--p', f)
+      // the playing row in whatever list is open fills the same way
+      ;(document.querySelector('.row.current') as HTMLElement | null)?.style.setProperty('--p', f)
       const text = d ? `${time(p)} / ${time(d)}` : ''
       if (text !== last && timeEl.current) {
         timeEl.current.textContent = text

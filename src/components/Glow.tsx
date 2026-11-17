@@ -10,7 +10,8 @@ import { useUI } from '../lib/ui'
 const W = 72
 const H = 46
 
-export function Glow() {
+/** `boost` brightens it (the now playing screen), `main` is the one behind the app */
+export function Glow({ main = true, boost = 1, className = '' }: { main?: boolean; boost?: number; className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export function Glow() {
       raf = requestAnimationFrame(frame)
       if (t - last < 33) return
       // fully covered by the now playing screen, nothing to draw for
-      if (useUI.getState().nowPlaying && document.querySelector('.np.open')?.getAnimations().length === 0) return
+      if (main && useUI.getState().nowPlaying && document.querySelector('.np.open')?.getAnimations().length === 0) return
       const dt = Math.min(t - last, 100)
       last = t
       const k = 1 - Math.exp(-dt / 450)
@@ -54,7 +55,7 @@ export function Glow() {
         const y = (b.y + Math.cos(t * b.sy + b.ph) * 0.12) * H
         const r = b.r * W * (1 + Math.sin(t * 0.00015 + b.ph) * 0.06)
         const [cr, cg, cb] = cur[i]
-        const a = intensity * (i === 0 ? 0.9 : 0.62)
+        const a = Math.min(1, intensity * boost * (i === 0 ? 0.9 : 0.62))
         const g = ctx.createRadialGradient(x, y, 0, x, y, r)
         g.addColorStop(0, `rgba(${cr | 0},${cg | 0},${cb | 0},${a})`)
         g.addColorStop(0.55, `rgba(${cr | 0},${cg | 0},${cb | 0},${a * 0.32})`)
@@ -78,7 +79,7 @@ export function Glow() {
   }, [])
 
   return (
-    <div className="glow" aria-hidden="true">
+    <div className={`glow ${className}`} aria-hidden="true">
       <canvas ref={ref} width={W} height={H} />
       <div className="glow-vignette" />
       <div className="glow-grain" />

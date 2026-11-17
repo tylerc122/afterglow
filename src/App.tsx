@@ -10,7 +10,6 @@ import { Glow } from './components/Glow'
 import { Sidebar } from './components/Sidebar'
 import { PlayerBar } from './components/PlayerBar'
 import { NowPlaying } from './components/NowPlaying'
-import { SongMoment } from './components/SongMoment'
 import { CommandPalette } from './components/CommandPalette'
 import { ContextMenu, Toasts, Topbar } from './components/Overlays'
 import { ScrollerCtx } from './components/Hero'
@@ -53,7 +52,6 @@ export function App() {
             {route.name === 'profile' && <Profile />}
           </div>
         </main>
-        <SongMoment />
         <PlayerBar />
         <NowPlaying />
         <CommandPalette />

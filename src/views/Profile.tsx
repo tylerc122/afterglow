@@ -596,22 +596,27 @@ function ColorStrip({ tracks, view }: { tracks: TopTrack[]; view: View }) {
     }
   }, [key])
 
-  const stripes = tracks
+  // black and white covers would end the band in a long gray run, so they only
+  // get in when there aren't enough colorful ones to fill it
+  const all = tracks
     .map((t) => {
       const p = cachedPalette(t.images.sm)
       if (!p) return null
-      const [h, s, l] = rgbToHsl(...p.colors[0])
-      return { t, c: p.colors[0], h: s < 0.12 ? 400 + l : h }
+      // the most colorful of the cover's colors, not just the dominant one
+      const c = [...p.colors].sort((a, b) => rgbToHsl(...b)[1] - rgbToHsl(...a)[1])[0]
+      const [h, s] = rgbToHsl(...c)
+      return { t, c, h, s }
     })
-    .filter(Boolean)
-    .sort((a, b) => a!.h - b!.h) as { t: TopTrack; c: [number, number, number]; h: number }[]
+    .filter(Boolean) as { t: TopTrack; c: [number, number, number]; h: number; s: number }[]
+  const colorful = all.filter((x) => x.s >= 0.15)
+  const stripes = (colorful.length >= 12 ? colorful : all).sort((a, b) => a.h - b.h)
 
   if (stripes.length < 8) return null
   return (
     <section className="section">
       <div className="section-row">
         <h2 className="section-title">Your colors</h2>
-        <span className="section-sub">The covers of your top {stripes.length} songs, {view === 'all' ? 'all-time' : RANGES.find((r) => r.id === view)!.long}, sorted by hue</span>
+        <span className="section-sub">The colors of your top {stripes.length} songs, {view === 'all' ? 'all-time' : RANGES.find((r) => r.id === view)!.long}, sorted by hue</span>
       </div>
       <div className="pf-colors">
         {stripes.map(({ t, c }) => (
@@ -686,7 +691,7 @@ function LogSection({ plays, shortTop }: { plays: Play[]; shortTop?: TopTrack[] 
                     key={t.id}
                     t={t}
                     right={
-                      <button className="icon-btn" onClick={() => setLiked(t, true)} aria-label={`Like ${t.name}`}>
+                      <button className="icon-btn" data-like onClick={() => setLiked(t, true)} aria-label={`Like ${t.name}`}>
                         <Icon name="heart" size={16} />
                       </button>
                     }

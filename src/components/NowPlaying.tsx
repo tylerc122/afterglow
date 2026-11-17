@@ -12,6 +12,7 @@ import { toggleNowPlaying, useUI } from '../lib/ui'
 import { Cover } from './Cover'
 import { Icon } from './Icon'
 import { Scrubber } from './Scrubber'
+import { Glow } from './Glow'
 
 export function NowPlaying() {
   const open = useUI((s) => s.nowPlaying)
@@ -80,6 +81,7 @@ function Stage({ open, onClosed }: { open: boolean; onClosed: () => void }) {
       ref={root}
       style={{ ['--np1' as any]: css(pal.colors[0], 0.55), ['--np2' as any]: css(pal.colors[1], 0.4) }}
     >
+      <Glow main={false} className="np-glow" />
       <div className="np-drag" />
       <button className="np-close icon-btn" onClick={() => toggleNowPlaying(false)} aria-label="Close now playing">
         <Icon name="collapse" size={18} />
