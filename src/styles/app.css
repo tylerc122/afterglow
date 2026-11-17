@@ -1531,7 +1531,7 @@ kbd {
 .icon-btn.remote {
   color: var(--accent);
 }
-/* volume slider tucks into the speaker and slides out on hover */
+/* volume slider sits next to the speaker, always out */
 .vol {
   display: flex;
   align-items: center;
@@ -1539,18 +1539,11 @@ kbd {
 .vol-range {
   -webkit-appearance: none;
   appearance: none;
-  width: 0;
+  width: 84px;
   height: 18px;
-  opacity: 0;
+  margin: 0 6px 0 2px;
   background: transparent;
   cursor: pointer;
-  transition: width var(--base) var(--ease), opacity var(--fast), margin var(--base) var(--ease);
-}
-.vol:hover .vol-range,
-.vol:focus-within .vol-range {
-  width: 84px;
-  margin: 0 6px 0 2px;
-  opacity: 1;
 }
 .vol-range::-webkit-slider-runnable-track {
   height: 4px;
