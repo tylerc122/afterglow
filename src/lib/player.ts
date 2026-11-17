@@ -108,6 +108,9 @@ export function initPlayer() {
     sdk.addListener('ready', ({ device_id }) => {
       set({ deviceId: device_id, sdkStatus: 'ready' })
       claimIfIdle(device_id)
+      try {
+        localStorage.setItem('afterglow.selfDevice', device_id)
+      } catch {}
     })
     sdk.addListener('not_ready', () => set({ local: false }))
     sdk.addListener('player_state_changed', (st) => {
@@ -158,15 +161,39 @@ export function initPlayer() {
 }
 
 /**
+ * Every launch the SDK comes back as a brand new device, but Spotify keeps the last
+ * launch's device marked active for a while. Anything sent there plays into the void
+ * (the ui says playing, nothing comes out). That's the id we saved last launch, or
+ * failing that an "Afterglow" that isn't us and isn't in the live device list.
+ */
+const prevSelf = (() => {
+  try {
+    return localStorage.getItem('afterglow.selfDevice')
+  } catch {
+    return null
+  }
+})()
+async function isGhost(dev?: { id?: string; name?: string } | null) {
+  const me = get().deviceId
+  if (!dev?.id || !me || dev.id === me) return false
+  if (dev.id === prevSelf) return true
+  if (dev.name !== 'Afterglow') return false
+  const live = await getDevices().catch(() => null)
+  return !!live && !live.some((d) => d.id === dev.id)
+}
+
+/**
  * If there's no session anywhere, quietly make this app the active device (paused).
+ * Same if the session is stuck on our own dead device from last launch.
  * A paused session on another device is left alone, so opening the laptop never
  * steals the desktop's queue, it just shows it.
  */
 async function claimIfIdle(deviceId: string) {
   const st = await refreshRemote()
-  if (!st) {
+  if (!st || (await isGhost(st.device))) {
     try {
       await api('/me/player', { method: 'PUT', body: { device_ids: [deviceId], play: false } })
+      if (st) setTimeout(refreshRemote, 800)
     } catch {}
   }
 }
@@ -277,7 +304,7 @@ async function playBody(body: Record<string, unknown>) {
   // clicking play in this app means play here, unless another device is mid-song.
   // If this app can't play (no DRM), use whatever device is around instead.
   let target: string | null = null
-  if (canPlayHere && (local || !activeDevice?.is_active)) target = deviceId
+  if (canPlayHere && (local || !activeDevice?.is_active || (await isGhost(activeDevice)))) target = deviceId
   else if (!canPlayHere && !activeDevice?.is_active) {
     target = await fallbackDevice()
     if (!target) return
