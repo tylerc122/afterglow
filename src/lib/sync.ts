@@ -1,7 +1,7 @@
 // Background sync. Cheap on every launch: one /me/playlists walk, then only
 // re-pull playlists whose snapshot_id changed.
 
-import { all, api, ApiError } from './api'
+import { all, api, ApiError, rateLimited } from './api'
 import * as N from './normalize'
 import {
   isOwned,
@@ -169,9 +169,9 @@ async function syncLiked(buffer: TrackBuffer) {
 let lastFocusSync = 0
 export function startBackgroundSync() {
   syncNow()
-  setInterval(() => document.visibilityState === 'visible' && syncNow(), 5 * 60_000)
+  setInterval(() => document.visibilityState === 'visible' && !rateLimited() && syncNow(), 5 * 60_000)
   window.addEventListener('focus', () => {
-    if (Date.now() - lastFocusSync > 60_000) {
+    if (Date.now() - lastFocusSync > 60_000 && !rateLimited()) {
       lastFocusSync = Date.now()
       syncNow()
     }

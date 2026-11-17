@@ -2,7 +2,7 @@
 // otherwise we remote-control whatever device is playing via the Web API.
 
 import { create } from 'zustand'
-import { api } from './api'
+import { api, rateLimited } from './api'
 import { getToken } from './auth'
 import * as N from './normalize'
 import { useLibrary } from './library'
@@ -276,8 +276,10 @@ let lastPoll = 0
 function startPolling() {
   if (pollTimer) return
   pollTimer = window.setInterval(() => {
-    if (document.visibilityState !== 'visible') return
-    const gap = get().local ? 15_000 : 4_000
+    if (document.visibilityState !== 'visible' || rateLimited()) return
+    // fast only while another device is actually playing, nothing playing anywhere is a slow check
+    const { local, paused, activeDevice } = get()
+    const gap = local ? 15_000 : activeDevice && !paused ? 4_000 : 30_000
     if (performance.now() - lastPoll >= gap - 100) poll()
   }, 1000)
 }
