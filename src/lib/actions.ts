@@ -80,11 +80,13 @@ export async function removeManyFromPlaylist(playlistId: string, tracks: Track[]
   putPlaylist({ ...p, total: Math.max(0, p.total - removed) })
   const what = removed > 1 ? `${removed.toLocaleString()} songs` : `“${tracks[0].name}”`
   try {
+    // no snapshot_id: with one, Spotify checks the request against that exact version
+    // and errors if ours is even slightly stale. By uri it doesn't need it.
     let snapshot = p.snapshot
     for (let i = 0; i < uris.length; i += 100) {
       const r = await api<{ snapshot_id: string }>(`/playlists/${playlistId}/items`, {
         method: 'DELETE',
-        body: { items: uris.slice(i, i + 100).map((uri) => ({ uri })), snapshot_id: snapshot },
+        body: { items: uris.slice(i, i + 100).map((uri) => ({ uri })) },
       })
       if (r?.snapshot_id) snapshot = r.snapshot_id
     }
@@ -94,10 +96,11 @@ export async function removeManyFromPlaylist(playlistId: string, tracks: Track[]
       ms: 6000,
       action: { label: 'Undo', run: () => restore(playlistId, prev.ids, gone) },
     })
-  } catch {
+  } catch (e) {
+    console.error('remove failed', e)
     putItems(prev)
     putPlaylist(p)
-    toast(`Couldn’t remove ${what}`)
+    toast(`Couldn’t remove ${what}${e instanceof Error && e.message ? ` (${e.message})` : ''}`, { ms: 6000 })
   }
 }
 
