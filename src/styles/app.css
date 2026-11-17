@@ -140,12 +140,12 @@ kbd {
 }
 .view {
   /* backwards, not both: a finished animation must not leave the page as a compositing layer */
-  animation: view-in 260ms var(--ease) backwards;
+  animation: view-in 120ms ease-out backwards;
 }
+/* just a quick fade, the art is already there from the small cached cover */
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
 }
 .page {

@@ -11,7 +11,6 @@ import { initPlayer, usePlayer } from './lib/player'
 import { startBackgroundSync } from './lib/sync'
 import { startPlayLog } from './lib/stats'
 import { Login } from './views/Welcome'
-import { watchFlights } from './lib/flight'
 import { watchLikes } from './lib/burst'
 
 // the desktop app has macOS window buttons over the top-left corner, CSS leaves room for them
@@ -36,7 +35,6 @@ async function boot() {
 
   // the whole library comes off disk before the first paint, so nothing ever "loads"
   await hydrate()
-  watchFlights()
   watchLikes()
   root.render(<App />)
   initPlayer()
