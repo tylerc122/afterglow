@@ -4,4 +4,6 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('afterglow', {
   historySummary: (force) => ipcRenderer.invoke('history:summary', !!force),
   appendLive: (rows) => ipcRenderer.invoke('history:live', rows),
+  // a new export landed in the folder and the summary's been rebuilt
+  onHistoryChanged: (fn) => void ipcRenderer.on('history:changed', () => fn()),
 })

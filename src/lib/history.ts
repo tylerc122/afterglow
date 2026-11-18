@@ -36,6 +36,7 @@ export type History = {
 type Bridge = {
   historySummary: (force?: boolean) => Promise<(History & { key: string }) | { missing: string } | { error: string }>
   appendLive: (rows: object[]) => Promise<number>
+  onHistoryChanged?: (fn: () => void) => void
 }
 const bridge = (window as any).afterglow as Bridge | undefined
 
@@ -46,14 +47,25 @@ export function loadHistory() {
   const s = useHistory.getState()
   if (!bridge || s.status !== 'idle') return
   useHistory.setState({ status: 'loading' })
-  bridge
+  fetchHistory()
+}
+
+function fetchHistory() {
+  bridge!
     .historySummary()
     .then((r) => {
-      if ('missing' in r || 'error' in r) useHistory.setState({ status: 'missing' })
+      if ('missing' in r || 'error' in r) useHistory.setState({ history: null, status: 'missing' })
       else useHistory.setState({ history: r, status: 'ready' })
     })
     .catch(() => useHistory.setState({ status: 'missing' }))
 }
+
+// a new export dropped in the folder: swap the numbers in place, no reload. If the
+// page never asked for history yet it'll get the new numbers when it does
+bridge?.onHistoryChanged?.(() => {
+  const { status } = useHistory.getState()
+  if (status === 'ready' || status === 'missing') fetchHistory()
+})
 
 /** same normalizing the export reader uses, so names match across the two */
 export const normName = (s: string) =>

@@ -4,7 +4,7 @@
 //    .data/afterglow_live.ndjson, so the observatory app can pick up where the
 //    export stops
 
-const { app, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain } = require('electron')
 const { Worker } = require('node:worker_threads')
 const fs = require('node:fs')
 const os = require('node:os')
@@ -83,9 +83,37 @@ function appendLive(rows) {
   return fresh.length
 }
 
+/**
+ * Drop a new export in the folder (or delete one) and the open window updates on
+ * its own: wait for the copy to settle (same zips, same sizes, twice in a row),
+ * rebuild, then tell the page. Watching costs nothing while nothing changes.
+ */
+function watchHistory() {
+  const dir = historyDir()
+  let known = zipKey(dir)
+  let timer = null
+  const settle = (last) => {
+    clearTimeout(timer)
+    timer = setTimeout(async () => {
+      const key = zipKey(dir)
+      if (key !== last) return settle(key) // still copying
+      if (key === known) return
+      known = key
+      await summary(false)
+      for (const w of BrowserWindow.getAllWindows()) w.webContents.send('history:changed')
+    }, 2000)
+  }
+  try {
+    fs.watch(dir, (_event, file) => {
+      if (!file || file.endsWith('.zip')) settle(zipKey(dir))
+    }).on('error', () => {})
+  } catch {} // no folder yet, nothing to watch
+}
+
 function registerHistory() {
   ipcMain.handle('history:summary', (_e, force) => summary(force))
   ipcMain.handle('history:live', (_e, rows) => appendLive(rows))
+  watchHistory()
 }
 
 module.exports = { registerHistory }
