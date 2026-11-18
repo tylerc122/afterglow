@@ -14,6 +14,26 @@ Unofficial, not affiliated with or endorsed by Spotify. You need Spotify Premium
 - **Spotify Connect.** It shows up as a device, controls your other devices, and picks up what's playing on your desktop.
 - ⌘K for everything, a full-screen now playing view, the queue, and the device picker.
 
+## Performance
+
+Both apps playing music with the window in the background, which is how I actually use them, sampled with `top` every 5 seconds for 5 minutes after a minute of warmup, on an Apple Silicon MacBook plugged in:
+
+|                  | Afterglow | Spotify  |
+| ---------------- | --------- | -------- |
+| CPU, average     | 3.5%      | 7.0%     |
+| CPU, median      | 3.5%      | 3.6%     |
+| CPU, peak        | 5.0%      | 35.6%    |
+| Energy impact    | 3.5       | 7.1      |
+| RAM              | 371 MB    | 1,031 MB |
+
+So about half the battery and a third of the memory. Most of the time they're doing about the same work, Spotify just keeps spiking and Afterglow never goes over 5%, and about a point and a half of Afterglow's number is Spotify's own DRM decoder, which any Spotify player pays for.
+
+It didn't start out like this, the first version sat at ~80% CPU and grew to 3 GB over an afternoon. What fixed it:
+
+- The glow drops to ~15fps while you're using the app and stops completely once the colors settle when the window's in the background.
+- The progress bar is a compositor animation that steps once per screen pixel, so it moves smoothly but only actually changes a few times a second, since every change makes the GPU redo the blur behind the player bar.
+- The little equalizer bars animate `transform` instead of `height`. Animating height repainted the playing row every frame and Chromium hung onto the paint memory, about 40 MB a minute while music was playing.
+
 ## Running it
 
 It's an Electron app on [castlabs' Electron build](https://github.com/castlabs/electron-releases), which ships the Widevine DRM module Spotify's player needs (regular Electron doesn't have it).
@@ -35,7 +55,7 @@ For development, run `npm run dev` and `npm run app:dev` side by side. The dev w
 
 ### Streaming history (optional)
 
-Put the zips from Spotify's Extended Streaming History export in `~/Spotify Data`, or point the app somewhere else with `{"historyDir": "~/wherever"}` in `~/Library/Application Support/Afterglow/config.json` (or `AFTERGLOW_HISTORY_DIR`). All the zips in the folder are read and overlapping exports get de-duped. Plays the app sees after that are appended to `.data/afterglow_live.ndjson` in that folder, in the export's own format.
+Put the zips from Spotify's Extended Streaming History export in `~/Spotify Data`, or point the app somewhere else with `{"historyDir": "~/wherever"}` in `~/Library/Application Support/Afterglow/config.json` (or `AFTERGLOW_HISTORY_DIR`). All the zips in the folder are read and overlapping exports get de-duped, and dropping in a new export updates the stats in the open window a few seconds later, no restart. Plays the app sees after that are appended to `.data/afterglow_live.ndjson` in that folder, in the export's own format.
 
 ## Notes
 
