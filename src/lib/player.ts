@@ -247,7 +247,9 @@ async function refreshRemote() {
   try {
     const st = await api<any>('/me/player', { query: { additional_types: 'track' } })
     if (!st) {
-      if (!get().local) set({ activeDevice: null })
+      // no session anywhere, like when the desktop app took over and then quit. Keep the
+      // song on screen but stop the clock, otherwise it "plays" to the end and sits there
+      if (!get().local) set({ activeDevice: null, paused: true, position: positionNow(), stamp: performance.now() })
       return null
     }
     if (st.device?.id && st.device.id === get().deviceId) return st
@@ -435,7 +437,25 @@ export async function toggle() {
   if (!s.track) return
   optimistic({ paused: !s.paused })
   if (s.local && sdk) return sdk.togglePlay()
-  await api(s.paused ? '/me/player/play' : '/me/player/pause', { method: 'PUT' }).catch(() => {})
+  // nothing to resume (the session's gone), so start the same song here, same spot
+  if (s.paused && !s.activeDevice) return resumeHere(s)
+  await api(s.paused ? '/me/player/play' : '/me/player/pause', { method: 'PUT' }).catch(() => {
+    if (s.paused) return resumeHere(s)
+    // pausing something that isn't there, just believe the server again
+    refreshRemote()
+  })
+}
+
+/** Play the song on screen from where it was, in its playlist/album if we know it */
+function resumeHere(s: PlayerState) {
+  const t = s.track
+  if (!t) return
+  const ctx = ctxOf(s)
+  const position_ms = Math.round(s.position)
+  const go = ctx && isRealContext(ctx) ? playContext(ctx, t.uri, position_ms) : playBody({ uris: [t.uri], position_ms })
+  return go.catch(() => {
+    set({ paused: true, position: s.position, stamp: performance.now() })
+  })
 }
 
 export async function next() {
