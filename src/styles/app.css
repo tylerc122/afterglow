@@ -3308,3 +3308,13 @@ kbd {
 .np-stage {
   position: relative;
 }
+
+/* nobody's looking (window unfocused or hidden), the forever loops can wait */
+html.idle .eq i,
+html.idle .sync-dot.on,
+html.idle .sk,
+html.idle .welcome-orb,
+html.idle .welcome-sun,
+html.idle .pf-avatar::before {
+  animation-play-state: paused;
+}

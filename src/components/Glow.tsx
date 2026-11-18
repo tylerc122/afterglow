@@ -1,9 +1,10 @@
 // The signature: a slow field of light behind everything, colored by the art.
-// Drawn on a tiny canvas (bilinear upscaling does the blur for free) at ~30fps,
+// Drawn on a tiny canvas (bilinear upscaling does the blur for free) at ~15fps,
 // colors ease toward the new palette over a second and a half.
 
 import { useEffect, useRef } from 'react'
 import { currentPalette, useAmbient } from '../lib/ambient'
+import { isActive, onActivity } from '../lib/focus'
 import type { RGB } from '../lib/types'
 import { useUI } from '../lib/ui'
 
@@ -20,11 +21,15 @@ export function Glow({ main = true, boost = 1, className = '' }: { main?: boolea
     let cur: RGB[] = currentPalette().colors.map((c) => [...c] as RGB)
     let target = cur
     let intensity = useAmbient.getState().intensity
-    let raf = 0
-    let last = 0
+    let timer = 0
+    let last = performance.now()
+    // the blobs' own clock, only ticks while drawing, so a frozen glow picks up
+    // where it left off instead of jumping
+    let clock = 0
 
     const unsub = useAmbient.subscribe((s) => {
       target = currentPalette(s).colors
+      wake()
     })
 
     // each blob drifts on its own slow lissajous path
@@ -35,16 +40,26 @@ export function Glow({ main = true, boost = 1, className = '' }: { main?: boolea
       { x: 0.15, y: 0.9, r: 0.45, sx: 0.00013, sy: 0.00006, ph: 1 },
     ]
 
-    const frame = (t: number) => {
-      raf = requestAnimationFrame(frame)
-      if (t - last < 33) return
-      // fully covered by the now playing screen, nothing to draw for
-      if (main && useUI.getState().nowPlaying && document.querySelector('.np.open')?.getAnimations().length === 0) return
-      const dt = Math.min(t - last, 100)
-      last = t
+    /** draws one frame, returns whether the colors are still easing somewhere */
+    const draw = () => {
+      const now = performance.now()
+      const dt = Math.min(now - last, 100)
+      last = now
+      clock += dt
+      const t = clock
       const k = 1 - Math.exp(-dt / 450)
-      cur = cur.map((c, i) => c.map((v, j) => v + (target[i][j] - v) * k) as RGB)
-      intensity += (useAmbient.getState().intensity - intensity) * k
+      let moving = false
+      cur = cur.map(
+        (c, i) =>
+          c.map((v, j) => {
+            const d = target[i][j] - v
+            if (Math.abs(d) > 0.5) moving = true
+            return v + d * k
+          }) as RGB,
+      )
+      const want = useAmbient.getState().intensity
+      if (Math.abs(want - intensity) > 0.002) moving = true
+      intensity += (want - intensity) * k
 
       ctx.globalCompositeOperation = 'source-over'
       ctx.fillStyle = '#08080a'
@@ -63,18 +78,40 @@ export function Glow({ main = true, boost = 1, className = '' }: { main?: boolea
         ctx.fillStyle = g
         ctx.fillRect(0, 0, W, H)
       })
+      return moving
     }
-    raf = requestAnimationFrame(frame)
 
-    const vis = () => {
-      cancelAnimationFrame(raf)
-      if (document.visibilityState === 'visible') raf = requestAnimationFrame(frame)
+    // ~15fps while you're looking (the drift is slow enough that more is wasted on the
+    // blurs layered over it), and when the window's in the background it only runs
+    // until a palette change finishes easing in, then stops
+    const step = () => {
+      timer = 0
+      if (document.visibilityState !== 'visible') return
+      // fully covered by the now playing screen, nothing to draw for, check back later
+      if (main && useUI.getState().nowPlaying && document.querySelector('.np.open')?.getAnimations().length === 0) {
+        last = performance.now()
+        timer = window.setTimeout(step, 300)
+        return
+      }
+      const moving = draw()
+      if (isActive()) timer = window.setTimeout(step, 66)
+      else if (moving) timer = window.setTimeout(step, 100)
     }
-    document.addEventListener('visibilitychange', vis)
+    function wake() {
+      if (timer) return
+      last = performance.now()
+      timer = window.setTimeout(step, 0)
+    }
+    draw()
+    wake()
+
+    const offActivity = onActivity(wake)
+    document.addEventListener('visibilitychange', wake)
     return () => {
-      cancelAnimationFrame(raf)
+      clearTimeout(timer)
       unsub()
-      document.removeEventListener('visibilitychange', vis)
+      offActivity()
+      document.removeEventListener('visibilitychange', wake)
     }
   }, [])
 

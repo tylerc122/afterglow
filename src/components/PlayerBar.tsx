@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { setLiked } from '../lib/actions'
 import { time } from '../lib/format'
+import { isActive, onActivity } from '../lib/focus'
 import { useLibrary } from '../lib/library'
 import {
   cycleRepeat,
@@ -207,26 +208,49 @@ function Rail({ pill, timeEl }: { pill: React.RefObject<HTMLDivElement>; timeEl:
   const drag = useRef<number | null>(null)
   const [dragging, setDragging] = useState(false)
 
+  const paint = useRef(() => {})
+
   useEffect(() => {
-    let raf = 0
-    let last = ''
-    const tick = () => {
-      raf = requestAnimationFrame(tick)
+    let timer = 0
+    let lastText = ''
+    let lastF = ''
+    let lastRow: HTMLElement | null = null
+    paint.current = () => {
       const s = usePlayer.getState()
       const d = s.track?.durationMs ?? 0
       const p = drag.current ?? positionNow()
-      const f = String(d ? Math.min(p / d, 1) : 0)
-      pill.current?.style.setProperty('--p', f)
+      // 3 decimals is well under a pixel on the rail, and it means a paused track
+      // writes nothing at all, so nothing under the blurs has to repaint
+      const f = (d ? Math.min(p / d, 1) : 0).toFixed(3)
       // the playing row in whatever list is open fills the same way
-      ;(document.querySelector('.row.current') as HTMLElement | null)?.style.setProperty('--p', f)
+      const row = document.querySelector('.row.current') as HTMLElement | null
+      if (f !== lastF || row !== lastRow) {
+        pill.current?.style.setProperty('--p', f)
+        row?.style.setProperty('--p', f)
+        lastF = f
+        lastRow = row
+      }
       const text = d ? `${time(p)} / ${time(d)}` : ''
-      if (text !== last && timeEl.current) {
+      if (text !== lastText && timeEl.current) {
         timeEl.current.textContent = text
-        last = text
+        lastText = text
       }
     }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    // 4 times a second is plenty for a rail that moves a pixel or two a second,
+    // and once a second when nobody's looking
+    const loop = () => {
+      paint.current()
+      timer = window.setTimeout(loop, isActive() ? 250 : 1000)
+    }
+    loop()
+    const off = onActivity(() => {
+      clearTimeout(timer)
+      loop()
+    })
+    return () => {
+      clearTimeout(timer)
+      off()
+    }
   }, [pill, timeEl])
 
   const at = (clientX: number) => {
@@ -244,8 +268,10 @@ function Rail({ pill, timeEl }: { pill: React.RefObject<HTMLDivElement>; timeEl:
   const onDown = (e: React.PointerEvent) => {
     drag.current = at(e.clientX).ms
     setDragging(true)
+    paint.current()
     const move = (ev: PointerEvent) => {
       drag.current = at(ev.clientX).ms
+      paint.current()
     }
     const up = () => {
       if (drag.current !== null) seek(drag.current)
