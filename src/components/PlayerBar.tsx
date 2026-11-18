@@ -2,10 +2,11 @@
 // the top edge is the scrubber, and the bar fills with a wash of the song's color
 // up to the playhead. Pausing dims it. Scroll anywhere on it for volume.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { setLiked } from '../lib/actions'
 import { time } from '../lib/format'
 import { isActive, onActivity } from '../lib/focus'
+import { progressAnimator } from '../lib/progress'
 import { useLibrary } from '../lib/library'
 import {
   cycleRepeat,
@@ -198,37 +199,64 @@ export function PlayerBar() {
 }
 
 /**
- * The rail of light along the top edge. A rAF loop writes progress into a CSS
- * variable on the island, so the rail, the playhead and the color wash all move
- * together without React re-rendering. Hover shows the time under the cursor.
+ * The rail of light along the top edge. The rail, the playhead, the color wash and
+ * the playing row's underline all ride compositor animations (see lib/progress), so
+ * they glide at full frame rate without JS or repaints. A slow timer handles the
+ * rest: the time text, and the --p bits that can't be transforms. Hover shows the
+ * time under the cursor.
  */
 function Rail({ pill, timeEl }: { pill: React.RefObject<HTMLDivElement>; timeEl: React.RefObject<HTMLSpanElement> }) {
   const rail = useRef<HTMLDivElement>(null)
+  const run = useRef<HTMLSpanElement>(null)
+  const fill = useRef<HTMLSpanElement>(null)
   const tip = useRef<HTMLSpanElement>(null)
   const drag = useRef<number | null>(null)
   const [dragging, setDragging] = useState(false)
 
   const paint = useRef(() => {})
+  const anim = useRef<ReturnType<typeof progressAnimator> | null>(null)
 
-  useEffect(() => {
+  // layout effect so the animations are on before the first paint, no flash of a full bar
+  useLayoutEffect(() => {
+    let row: HTMLElement | null = null
+    const a = progressAnimator(() => {
+      const wash = pill.current?.querySelector('.pill-wash')
+      const r = rail.current
+      // where the rail sits inside the island, for the wash that runs edge to playhead
+      const L = r?.offsetLeft ?? 0
+      const W = r?.offsetWidth ?? 0
+      const P = (wash as HTMLElement | null)?.offsetWidth || 1
+      return [
+        { el: fill.current, at: (p) => `scaleX(${p})`, span: W },
+        { el: run.current, at: (p) => `translateX(${p * W}px)`, span: W },
+        { el: wash, pseudo: '::before', at: (p) => `scaleX(${(L + p * W) / P})`, span: W },
+        { el: wash, pseudo: '::after', at: (p) => `translateX(${L + p * W}px)`, span: W },
+        { el: row, pseudo: '::after', at: (p) => `scaleX(${p})`, span: (row?.offsetWidth ?? 0) - 24 },
+      ]
+    }, () => drag.current)
+    anim.current = a
+
     let timer = 0
     let lastText = ''
     let lastF = ''
-    let lastRow: HTMLElement | null = null
     paint.current = () => {
       const s = usePlayer.getState()
       const d = s.track?.durationMs ?? 0
       const p = drag.current ?? positionNow()
-      // 3 decimals is well under a pixel on the rail, and it means a paused track
-      // writes nothing at all, so nothing under the blurs has to repaint
+      // what's left on --p: the wash edge fading in, the playing row's tint. 3 decimals
+      // means a paused track writes nothing at all
       const f = (d ? Math.min(p / d, 1) : 0).toFixed(3)
-      // the playing row in whatever list is open fills the same way
-      const row = document.querySelector('.row.current') as HTMLElement | null
-      if (f !== lastF || row !== lastRow) {
+      // the playing row in whatever list is open, it comes and goes as lists scroll
+      const now = document.querySelector('.row.current') as HTMLElement | null
+      if (now !== row) {
+        row = now
+        a.sync()
+        lastF = ''
+      }
+      if (f !== lastF) {
         pill.current?.style.setProperty('--p', f)
         row?.style.setProperty('--p', f)
         lastF = f
-        lastRow = row
       }
       const text = d ? `${time(p)} / ${time(d)}` : ''
       if (text !== lastText && timeEl.current) {
@@ -236,20 +264,25 @@ function Rail({ pill, timeEl }: { pill: React.RefObject<HTMLDivElement>; timeEl:
         lastText = text
       }
     }
-    // 4 times a second is plenty for a rail that moves a pixel or two a second,
-    // and once a second when nobody's looking
+    // just the time text and the --p leftovers, the animations run themselves
     const loop = () => {
       paint.current()
       timer = window.setTimeout(loop, isActive() ? 250 : 1000)
     }
+    a.sync()
     loop()
     const off = onActivity(() => {
       clearTimeout(timer)
+      a.sync()
       loop()
     })
+    const ro = new ResizeObserver(() => a.sync())
+    if (pill.current) ro.observe(pill.current)
     return () => {
       clearTimeout(timer)
       off()
+      ro.disconnect()
+      a.stop()
     }
   }, [pill, timeEl])
 
@@ -269,13 +302,18 @@ function Rail({ pill, timeEl }: { pill: React.RefObject<HTMLDivElement>; timeEl:
     drag.current = at(e.clientX).ms
     setDragging(true)
     paint.current()
+    anim.current?.sync()
     const move = (ev: PointerEvent) => {
       drag.current = at(ev.clientX).ms
       paint.current()
+      anim.current?.sync()
     }
     const up = () => {
-      if (drag.current !== null) seek(drag.current)
+      // let go before seeking, the seek's state change re-syncs the animations
+      const ms = drag.current
       drag.current = null
+      if (ms !== null) seek(ms)
+      anim.current?.sync()
       setDragging(false)
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
@@ -287,9 +325,12 @@ function Rail({ pill, timeEl }: { pill: React.RefObject<HTMLDivElement>; timeEl:
   return (
     <div className={`rail ${dragging ? 'dragging' : ''}`} ref={rail} onPointerMove={onMove} onPointerDown={onDown} aria-label="Seek" role="slider">
       <span className="rail-line">
-        <span className="rail-fill" />
+        <span className="rail-fill" ref={fill} />
       </span>
-      <span className="rail-head" />
+      {/* the runner slides, the head inside it is free to scale on hover */}
+      <span className="rail-run" ref={run}>
+        <span className="rail-head" />
+      </span>
       <span className="rail-tip" ref={tip} />
     </div>
   )

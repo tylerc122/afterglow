@@ -1206,8 +1206,10 @@ kbd {
 .pill-wash::before {
   content: '';
   position: absolute;
-  inset: 0 auto 0 0;
-  width: calc(var(--edge-l) + var(--p) * (100% - var(--edge-l) - var(--edge)));
+  /* full width and scaled from the left by lib/progress, so it glides without repainting */
+  inset: 0;
+  transform-origin: left;
+  transform: scaleX(var(--p, 0));
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 7%, transparent) 40%,
       color-mix(in srgb, var(--accent) 17%, transparent));
 }
@@ -1217,7 +1219,8 @@ kbd {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(var(--edge-l) + var(--p) * (100% - var(--edge-l) - var(--edge)));
+  /* slid into place by lib/progress */
+  left: 0;
   width: 60px;
   margin-left: -60px;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 22%, transparent));
@@ -1255,16 +1258,23 @@ kbd {
 }
 .rail-fill {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: calc(var(--p) * 100%);
+  inset: 0;
+  transform-origin: left;
+  transform: scaleX(var(--p, 0));
   border-radius: inherit;
   background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 30%, transparent), var(--accent));
   box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 80%, transparent);
 }
+.rail-run {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(calc(var(--p, 0) * 100%));
+}
 .rail-head {
   position: absolute;
   top: 4px;
-  left: calc(var(--p) * 100%);
+  left: 0;
   width: 8px;
   height: 8px;
   margin-left: -4px;
@@ -1649,9 +1659,16 @@ kbd {
   background: var(--accent);
   box-shadow: 0 0 12px var(--accent);
 }
+.scrub-run {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
 .scrub-thumb {
   position: absolute;
-  left: calc(var(--p) * 100%);
+  left: 0;
   width: 12px;
   height: 12px;
   margin-left: -6px;
@@ -3282,7 +3299,9 @@ kbd {
   left: 12px;
   bottom: 0;
   height: 2px;
-  width: calc(var(--p, 0) * (100% - 24px));
+  width: calc(100% - 24px);
+  transform-origin: left;
+  transform: scaleX(var(--p, 0));
   border-radius: 2px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 20%, transparent), var(--accent));
   box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 70%, transparent);
