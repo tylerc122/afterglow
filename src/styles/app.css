@@ -902,10 +902,14 @@ kbd {
   height: 13px;
   flex-shrink: 0;
 }
+/* scaleY, not height: animating height repainted the whole row every frame and
+   chromium hung onto the paint memory, the app grew ~40MB a minute while playing */
 .eq i {
   width: 3px;
+  height: 13px;
   border-radius: 1px;
   background: var(--accent);
+  transform-origin: bottom;
   animation: eq 0.9s ease-in-out infinite;
 }
 .eq i:nth-child(2) {
@@ -917,16 +921,16 @@ kbd {
   animation-duration: 1.05s;
 }
 .eq.paused i {
-  animation-play-state: paused;
-  height: 4px;
+  animation: none;
+  transform: scaleY(0.3);
 }
 @keyframes eq {
   0%,
   100% {
-    height: 3px;
+    transform: scaleY(0.23);
   }
   50% {
-    height: 13px;
+    transform: scaleY(1);
   }
 }
 
@@ -2567,19 +2571,15 @@ kbd {
   position: absolute;
   inset: -5px;
   border-radius: 50%;
-  background: conic-gradient(from var(--spin, 0deg), var(--accent), var(--tint), transparent 60%, var(--accent));
+  background: conic-gradient(var(--accent), var(--tint), transparent 60%, var(--accent));
+  /* spin the ring itself, not the gradient angle, so it never repaints */
   animation: pf-spin 14s linear infinite;
   z-index: -1;
   opacity: 0.85;
 }
-@property --spin {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0deg;
-}
 @keyframes pf-spin {
   to {
-    --spin: 360deg;
+    transform: rotate(360deg);
   }
 }
 .pf-avatar img {
